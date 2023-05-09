@@ -10,24 +10,25 @@ const { Client } = require('pg');
 
 //Zona de la base de datos
 //Creamos la constante donde se guarda la conexion a la base de datos
-const client = new Client({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'postgres',
-  password: 'D@sarfire13',
+var client = new Client({
+  user: 'user_dev',
+  host: '74.208.24.181',
+  database: 'td-image',
+  password: '90Y9B8yh$45',
   port: 5432 // Puerto por defecto de PostgreSQL
 });
 
-
+//Para crear la tabla de la base de datos
 /*
 client.connect();
 const queryText = `
 CREATE TABLE Imagenes (
   idPeticion SERIAL PRIMARY KEY,
   ipPeticion Varchar(40),
-  peticionEstatus boolean,
+  path Varchar(255),
+  tipoArchivo varchar(10),
   peso int,
-  path Varchar(255)
+  peticionValida boolean
 );
 `;
 client.query(queryText)
@@ -36,15 +37,26 @@ client.query(queryText)
   .finally(() => client.end());
 */
 
-//Haseado mamalon
-const message = 'Hello, world!';
-const secret = 'my_secret_key';
+/*
+client.connect();
+const queryText = `
+DROP  TABLE imagenes;
+`;
+client.query(queryText)
+  .then(() => console.log('Tabla eliminada exitosamente'))
+  .catch(error => console.error('Error al borrar tabla:', error))
+  .finally(() => client.end());
+*/
 
-const hmac = crypto.createHmac('sha256', secret);
-hmac.update(message);
-const digest = hmac.digest('hex');
+  //Haseado mamalon
+// const message = 'Hello, world!';
+// const secret = 'my_secret_key';
 
-console.log(digest);
+// const hmac = crypto.createHmac('sha256', secret);
+// hmac.update(message);
+// const digest = hmac.digest('hex');
+
+// console.log(digest);
 
 
 //Inicializamos el framework
@@ -52,9 +64,6 @@ const app = express();
 
 //Para configurar el puerto
 app.set('port',4000);
-app.set('views', path.join(__dirname, 'views'));
-app.set('view engine', 'ejs');
-
 
 //Middleware
 const storage = multer.diskStorage({
@@ -82,29 +91,62 @@ app.use(multer({
 );
 
 //Rotutes
-app.get('/', (req,res) => {
-    res.render('index');
-} )
 
-app.post('/upload', (req,res)=>{
+
+app.post('/upload', async (req,res) => {
+    //Convirtiendo las variables  del hash
+    var message = req.file.originalname + req.body.numeroaleatorio;
+    
+    //Haseado mamalon
+  const secret = 'YrekcBMw2d8KI0gJL@I2cs#ng3UFIW';
+
+  var hmac = crypto.createHmac('sha256', secret);
+  hmac.update(message);
+  var digest = hmac.digest('hex');
+
+  var body1 = req.body.hash
+
+  var ip = req.connection.remoteAddress;
+  //Obtenemos el tipo de archivo
+  var tipoArchivo = path.extname(req.file.originalname).toLocaleLowerCase();
+  //Obtenemos el peso
+  var peso = parseInt(req.file.size);
+  var path1 = req.file.path; 
+  var esValido = false;
+  var queryInsertar = "";
+
+  if(digest != body1){
+    //Abrimos la conexion
+    queryInsertar = `INSERT INTO imagenes (ippeticion, path, tipoarchivo, peso, peticionValida) VALUES ($1, $2, $3, $4, $5); `;
+    path1 = null;
+    tipoArchivo = null;
+    peso = null;    
+  }
+  else{
+    queryInsertar = `INSERT INTO imagenes (ippeticion, path, tipoarchivo, peso, peticionValida) VALUES ($1, $2, $3, $4, $5);`;    
+    esValido = true;
+  }
   client.connect();
+  await client.query(queryInsertar, [ip, path1, tipoArchivo, peso, esValido])
+    .then(() => console.log('Dato insertado exitosamente'))
+    .catch(error => console.error('Error al insertar dato:', error))
 
-  const ip = req.connection.remoteAddress;
-  console.log(ip);
+  queryInsertar = `SELECT * FROM imagenes;`;
+  var algo = {};
+  await client.query(queryInsertar)
+  .then((data) =>    {
+    algo = data;
+  })
+  .catch(error => 
+    console.error('Error al insertar dato:', error)
+    )
+  .finally(() => 
+    client.end()
+    );
 
-  const queryInsertar = `
-  INSERT INTO users (name, email)
-  VALUES (12, 'juan@example.com');
-`;
-client.query(queryInsertar)
-  .then(() => console.log('Dato insertado exitosamente'))
-  .catch(error => console.error('Error al insertar dato:', error))
-  .finally(() => client.end());
-  console.log(req.file);
-  console.log(req.file.originalname);
-  console.log(req.file.path);
-  res.send('uploaded');
+    res.send(algo);
 })
+
 
 //Static Files
 app.use(express.static(path.join(__dirname, 'public')));
